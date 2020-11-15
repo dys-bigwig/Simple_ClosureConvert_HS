@@ -27,18 +27,19 @@ classify :: Expr -> State Scope CExpr
 classify var = do
   scope <- get
   f var scope
-  where f var scope | (Just i) <- elemIndex var $ locals scope = return $ CVar Loc i
-                    | (Just i) <- elemIndex var $ env scope =
-                      case elemIndex var $ captures scope of
+  where f var scope | (Just i) <- var `inLocals` scope = return $ CVar Loc i
+                    | (Just i) <- var `inEnv` scope =
+                      case var `inCaptures` scope of
                         (Just i) -> return $ CVar Env i
-                        Nothing -> do put $ Scope (locals scope)
-                                                  (env scope)
-                                                  (captures scope ++ [var])
-                                                  (globals scope)
+                        Nothing -> do put $ scope{captures = captures scope ++ [var]} 
                                       scope' <- get
                                       return $ CVar Env ((length $ captures scope') - 1)
-                    | (Just i) <- elemIndex var $ globals scope = return $ CVar Glo i 
+                    | (Just i) <- var `inGlobals` scope = return $ CVar Glo i 
                     | otherwise = error $ show var ++ "unbound" ++ (show scope)
+        inLocals v s = elemIndex v (locals s)
+        inEnv v s = elemIndex v (env s)
+        inCaptures v s = elemIndex v (captures s)
+        inGlobals v s = elemIndex v (globals s)
         f ::  Expr -> Scope -> State Scope CExpr
 
 cc :: Expr -> State Scope CExpr
@@ -47,13 +48,12 @@ cc expr = do
   case expr of EVar _ -> classify expr
                EBool b -> return $ CBool b
                EInt i -> return $ CInt i
-                               -- (Expr -> State Scope) -> [Expr] -> State Scope [Expr]
                ELam vs e -> do vs' <- mapM cc (captures bodyScope)
                                return $ CClos vs' e'
                                where (e', bodyScope) = runState (cc e) (Scope vs
-                                                                       (locals scope ++ env scope)
-                                                                       []
-                                                                       (globals scope))
+                                                                              (locals scope ++ env scope)
+                                                                              []
+                                                                              (globals scope))
                EApp e1 e2 -> do e1' <- cc e1
                                 e2' <- cc e2
                                 return $ CApp e1' e2'
