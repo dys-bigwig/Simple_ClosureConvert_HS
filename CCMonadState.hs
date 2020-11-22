@@ -26,18 +26,6 @@ data CExpr = CVar Storage Int
            | CClos [CExpr] CExpr
            | CApp CExpr CExpr deriving(Eq, Show)
 
-fromLocal :: (MonadState Scope m) => Expr -> m CExpr
-fromLocal v = do
-  scope <- get
-  case (elemIndex v $ env scope) of
-    (Just i) -> return $ CVar Loc i
-
-fromGlobals :: (MonadState Scope m) => Expr -> m CExpr
-fromGlobals v = do
-  scope <- get
-  case (elemIndex v $ env scope) of
-    (Just i) -> return $ CVar Glo i
-
 classify :: (MonadState Scope m) => Expr -> m CExpr
 classify var = do
   scope <- get
